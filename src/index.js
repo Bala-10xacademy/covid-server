@@ -2,46 +2,124 @@ const express = require('express')
 const app = express()
 const bodyParser = require("body-parser");
 const port = 8080
+const {tallySchema}=require('./schema');
 
 // Parse JSON bodies (as sent by API clients)
 app.use(express.urlencoded({ extended: false }));
 app.use(express.json());
 const { connection } = require('./connector')
 
+app.get('/', (req, res) => {
+  res.send("working")
+});
 
-// Route to get total number of recovered patients
 app.get('/totalRecovered', async (req, res) => {
-    const totalRecovered = await connection.aggregate([
-      {$group: {_id: "total",recovered: { $sum: "$recovered" } } }
-    ]).toArray();
-    res.json({ data: totalRecovered[0] });
-  });
+  try {
+      const data = await tallySchema.find();
+      let total = 0;
+      for (i = 0; i < data.length; i++) {
+          total += data[i].recovered
+      }
+      res.status(200).json({
+          data: { _id: "total", recovered: total },
+
+      })
+  } catch (error) {
+      res.status(500).json({
+          sta: "failed",
+          message: error.message
+      })
+  }
+
+})
+app.get('/totalActive', async (req, res) => {
+
+    try {
+        const data = await tallySchema.find();
+        let total = 0;
+        for (i = 0; i < data.length; i++) {
+            total += data[i].infected
+        }
+        res.status(200).json({
+            data: { _id: "total", infected: total },
   
-  // Route to get total number of active patients
-  app.get('/totalActive', async (req, res) => {
-    const totalActive = await connection.aggregate([
-      {$group: { _id: "total", active: { $sum: { $subtract: ["$infected", "$recovered"] } } } }
-    ]).toArray();
-    res.json({ data: totalActive[0] });
-  });
+        })
+    } catch (error) {
+        res.status(500).json({
+            sta: "failed",
+            message: error.message
+        })
+    }
+
+})
+app.get('/totalDeath', async (req, res) => {
+    try {
+        const data = await tallySchema.find();
+        let total = 0;
+        for (i = 0; i < data.length; i++) {
+            total += data[i].death
+        }
+        res.status(200).json({
+            data: { _id: "total", death: total },
   
-  // Route to get total number of deaths
-  app.get('/totalDeath', async (req, res) => {
-    const totalDeath = await connection.aggregate([
-      {$group: {_id: "total",death: { $sum: "$death" }} }
-    ]).toArray();
-    res.json({ data: totalDeath[0] });
-  });
+        })
+    } catch (error) {
+        res.status(500).json({
+            sta: "failed",
+            message: error.message
+        })
+    }
+
+})
+app.get('/hotspotStates', async (req, res) => {
+
+    try {
+        const data = await tallySchema.find();
+        const hotspotStates = [];
+        for (let i = 0; i < data.length; i++) {
+            const { infected, recovered } = data[i];
+            const rate = ((infected - recovered) / infected).toFixed(5);
+            if (rate > 0.1) {
+                hotspotStates.push({ state: data[i].state, rate });
+            }
+        }
+    
+        res.status(200).json({
+            data: hotspotStates,
+        });
+    } catch (error) {
+        res.status(500).json({
+            status: "failed",
+            message: error.message,
+        });
+    }
+
+})
+app.get('/healthyStates', async (req, res) => {
+ 
+    try {
+        const data = await tallySchema.find();
+        const states=[];
+        for (i = 0; i < data.length; i++) {
+            let mortality=data[i].death/data[i].infected;
+            if(mortality<0.005){
+                states.push({state:data[i].state,mortality:mortality})
+            }
+          
+        }
+        res.status(200).json({
+            data: states,
   
-  // Route to get hotspot states
-  app.get('/hotspotStates', async (req, res) => {
-    const hotspotStates = await connection.aggregate([
-      {$project: {_id: 0,state: 1,rate: {$round: [{$divide: [{ $subtract: ["$infected", "$recovered"] },"$infected" ]}, 5 ]} } },
-      {$match: {rate: { $gt: 0.1 }}},
-      {$sort: {rate: -1}}
-    ]).toArray();
-    res.json({ data: hotspotStates });
-  });
+        })
+    } catch (error) {
+        res.status(500).json({
+            sta: "failed",
+            message: error.message
+        })
+    }
+})
+
+
   
 app.listen(port, () => console.log(`App listening on port ${port}!`))
 

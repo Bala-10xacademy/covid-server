@@ -16,13 +16,3 @@ collection_connection = mongoose.model('covidtally', tallySchema)
 
 
 exports.connection = collection_connection;
-exports.addTally = async function (newTally) {
-    try {
-      const result = await collection_connection.create(newTally);
-      console.log('New tally added to database:', result);
-      return result;
-    } catch (error) {
-      console.error('Error adding new tally to database:', error);
-      return error;
-    }
-  }
